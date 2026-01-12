@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jelly Glitch: Minimalist Edition</title>
+    <style>
+        /* Menggunakan font Monospace untuk kesan retro/minimalis */
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111; 
+            font-family: 'Courier New', Courier, monospace;
+            color: white;
+        }
+
+        #gameContainer {
+            position: relative;
+            /* LAYAR PENUH */
+            width: 100vw;       
+            height: 100vh;
+            overflow: hidden;
+            background: #050505;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlay Layer */
+        #uiLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 30px;
+            box-sizing: border-box;
+        }
+
+        /* Top HUD */
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .timer-box {
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border: 2px solid #fff;
+            color: #fff;
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        .speed-meter {
+            color: #aaa;
+            font-size: 24px;
+        }
+
+        /* Controls Visualizer */
+        .controls-hud {
+            display: flex;
+            gap: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .key-cap {
+            width: 40px;
+            height: 40px;
+            border: 2px solid #555;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            color: #555;
+            font-weight: bold;
+            transition: all 0.1s;
+        }
+
+        .key-cap.active {
+            border-color: #fff;
+            color: #fff;
+            transform: scale(1.1);
+            box-shadow: 0 0 15px currentColor;
+        }
+
+        /* Start/End Screens */
+        #menuOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 10;
+            transition: opacity 0.5s;
+        }
+
+        h1 {
+            color: #fff;
+            font-size: 64px;
+            margin: 0 0 20px 0;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+        }
+
+        .btn {
+            background: transparent;
+            color: #fff;
+            border: 2px solid #fff;
+            padding: 15px 40px;
+            font-family: inherit;
+            font-size: 24px;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+        }
+
+        .btn:hover {
+            background: #fff;
+            color: #000;
+        }
+
+        .tutorial-text {
+            color: #888;
+            margin-top: 15px;
+            font-size: 18px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .hidden { display: none !important; opacity: 0; pointer-events: none; }
+
+        /* Easter Egg Notification */
+        #notification {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 40px;
+            color: #fff;
+            text-shadow: 0 0 10px #fff;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+            z-index: 20;
+            font-weight: bold;
+        }
+        #notification.show { opacity: 1; }
+
+    </style>
+</head>
+<body>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="uiLayer">
+            <div class="hud-top">
+                <div class="timer-box" id="timerDisplay">00.00</div>
+                <div class="speed-meter" id="velocityDisplay">0 km/h</div>
+            </div>
+            
+            <div id="notification">DISCO MODE!</div>
+
+            <div style="display: flex; justify-content: center; width: 100%;">
+                <div class="controls-hud">
+                    <div class="key-cap" id="key1" style="color: #ff4444; border-color: #ff4444;">1</div>
+                    <div class="key-cap" id="key2" style="color: #44ff44; border-color: #44ff44;">2</div>
+                    <div class="key-cap" id="key3" style="color: #4444ff; border-color: #4444ff;">3</div>
+                    <div class="key-cap" id="key4" style="color: #ffff44; border-color: #ffff44;">4</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="menuOverlay">
+            <h1>GLITCH RUNNER</h1>
+            <button class="btn" onclick="startGame()">START RUN</button>
+            <div class="tutorial-text">
+                [WASD/ARROWS] Move & Jump<br>
+                [1-2-3-4] Switch Colors<br>
+                <span style="color: #ffff44;">PRO TIP:</span> Switch color inside a block to <b>GLITCH JUMP</b>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Setup Dynamic Canvas Size
+        let GAME_WIDTH = window.innerWidth;
+        let GAME_HEIGHT = window.innerHeight;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            GAME_WIDTH = canvas.width;
+            GAME_HEIGHT = canvas.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Constants & Physics Tuning
+        const GRAVITY = 0.55;
+        const TERMINAL_VELOCITY = 16;
+        const ACCEL = 1.2;
+        const FRICTION = 0.85; 
+        const JUMP_FORCE = -11.5; 
+        const GLITCH_FORCE = 26; 
+        const TIME_SCALE_SLOW = 0.2; 
+
+        // Colors (Minimalist Neon Palette)
+        const PALETTE = {
+            1: { hex: '#ff3333', name: 'Red' },
+            2: { hex: '#33ff33', name: 'Green' },
+            3: { hex: '#3333ff', name: 'Blue' },
+            4: { hex: '#ffff33', name: 'Yellow' }
+        };
+
+        // Game Engine State
+        let state = {
+            running: false,
+            timeScale: 1.0,
+            startTime: 0,
+            elapsed: 0,
+            camera: { x: 0, y: 0, shake: 0 },
+            particles: [],
+            shouts: [], 
+            platforms: [],
+            player: null,
+            keys: {},
+            lastJumpPress: 0, 
+            victory: false,
+            discoMode: false,
+            discoTimer: 0
+        };
+
+        // --- CLASSES ---
+
+        class Player {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.w = 30; // Slightly larger standard size
+                this.h = 30;
+                this.vx = 0;
+                this.vy = 0;
+                this.color = 1;
+                this.grounded = false;
+                this.coyoteTime = 0;
+                this.facingRight = true;
+                
+                // Spring Physics for animation (Kept from V2)
+                this.squash = { x: 1, y: 1 };
+                this.squashVel = { x: 0, y: 0 };
+            }
+
+            update() {
+                // Input Processing
+                if (state.keys['ArrowRight'] || state.keys['KeyD']) {
+                    this.vx += ACCEL;
+                    this.facingRight = true;
+                }
+                if (state.keys['ArrowLeft'] || state.keys['KeyA']) {
+                    this.vx -= ACCEL;
+                    this.facingRight = false;
+                }
+                
+                // Physics
+                this.vx *= FRICTION;
+                if (Math.abs(this.vx) < 0.1) this.vx = 0;
+
+                this.vy += GRAVITY * state.timeScale;
+                if (this.vy > TERMINAL_VELOCITY) this.vy = TERMINAL_VELOCITY;
+
+                this.x += this.vx * state.timeScale;
+                this.checkCollisions(true);
+
+                this.y += this.vy * state.timeScale;
+                this.grounded = false;
+                this.checkCollisions(false);
+
+                // Spring Physics Logic
+                const k = 0.15; 
+                const d = 0.8;  
+                
+                const forceX = (1 - this.squash.x) * k;
+                const forceY = (1 - this.squash.y) * k;
+                
+                this.squashVel.x += forceX;
+                this.squashVel.y += forceY;
+                
+                this.squashVel.x *= d;
+                this.squashVel.y *= d;
+                
+                this.squash.x += this.squashVel.x;
+                this.squash.y += this.squashVel.y;
+
+                // Coyote & Jump
+                if (this.grounded) this.coyoteTime = 6; 
+                else this.coyoteTime--;
+
+                if (state.keys['Space'] || state.keys['ArrowUp'] || state.keys['KeyW']) {
+                    state.lastJumpPress = 6;
+                    state.keys['Space'] = false;
+                }
+                if (state.lastJumpPress > 0) state.lastJumpPress--;
+
+                if (state.lastJumpPress > 0 && (this.grounded || this.coyoteTime > 0)) {
+                    this.vy = JUMP_FORCE;
+                    this.grounded = false;
+                    this.coyoteTime = 0;
+                    state.lastJumpPress = 0;
+                    
+                    this.applySquash(0.6, 1.4);
+                    createParticles(this.x + this.w/2, this.y + this.h, PALETTE[this.color].hex, 5);
+                }
+
+                this.checkGlitchZone();
+
+                if (this.y > 2000) resetLevel();
+            }
+
+            applySquash(x, y) {
+                this.squash.x = x;
+                this.squash.y = y;
+                this.squashVel.x = 0;
+                this.squashVel.y = 0;
+            }
+
+            checkCollisions(horizontal) {
+                for (let p of state.platforms) {
+                    if (p.color !== this.color) continue;
+
+                    if (this.x < p.x + p.w && this.x + this.w > p.x &&
+                        this.y < p.y + p.h && this.y + this.h > p.y) {
+                        
+                        if (horizontal) {
+                            if (this.vx > 0) this.x = p.x - this.w;
+                            else if (this.vx < 0) this.x = p.x + p.w;
+                            this.vx = 0;
+                            this.applySquash(0.7, 1.3); // Hit wall
+                        } else {
+                            if (this.vy > 0) { // Landing
+                                this.y = p.y - this.h;
+                                if (!this.grounded) {
+                                    let impact = Math.min(Math.abs(this.vy) * 0.05, 0.4);
+                                    this.applySquash(1 + impact, 1 - impact); 
+                                }
+                                this.grounded = true;
+                                this.vy = 0;
+                            } else if (this.vy < 0) { // Ceiling
+                                this.y = p.y + p.h;
+                                this.vy = 0;
+                                this.applySquash(1.3, 0.7); // Bonk head
+                            }
+                        }
+                    }
+                }
+            }
+
+            checkGlitchZone() {
+                let insideBlock = false;
+                for (let p of state.platforms) {
+                    if (p.color === this.color) continue; 
+
+                    if (this.x + 8 < p.x + p.w && this.x + this.w - 8 > p.x &&
+                        this.y + 8 < p.y + p.h && this.y + this.h - 8 > p.y) {
+                        insideBlock = true;
+                        p.highlight = true;
+                    } else {
+                        p.highlight = false;
+                    }
+                }
+                const targetScale = insideBlock ? TIME_SCALE_SLOW : 1.0;
+                state.timeScale += (targetScale - state.timeScale) * 0.2;
+            }
+
+            switchColor(newColor) {
+                if (this.color === newColor) return;
+                
+                createParticles(this.x + this.w/2, this.y + this.h/2, PALETTE[this.color].hex, 8);
+                this.color = newColor;
+                updateUIKeys(newColor);
+
+                for (let p of state.platforms) {
+                    if (p.color === newColor) {
+                        if (this.x < p.x + p.w && this.x + this.w > p.x &&
+                            this.y < p.y + p.h && this.y + this.h > p.y) {
+                            
+                            let dx = (this.x + this.w/2) - (p.x + p.w/2);
+                            let dy = (this.y + this.h/2) - (p.y + p.h/2);
+                            
+                            let dist = Math.sqrt(dx*dx + dy*dy);
+                            if (dist === 0) { dx = 0; dy = -1; dist = 1; }
+                            
+                            this.vx = (dx / dist) * GLITCH_FORCE;
+                            this.vy = (dy / dist) * GLITCH_FORCE;
+
+                            state.camera.shake = 25;
+                            state.timeScale = 0.05; 
+                            setTimeout(() => { state.timeScale = 1.0 }, 150);
+                            createParticles(this.x + this.w/2, this.y + this.h/2, '#FFF', 30);
+                            
+                            this.applySquash(0.4, 1.6);
+                            createShout(this.x, this.y - 40, "GLITCH!");
+                        }
+                    }
+                }
+            }
+
+            draw(ctx) {
+                const c = PALETTE[this.color];
+                
+                ctx.save();
+                ctx.translate(this.x + this.w/2, this.y + this.h/2);
+                
+                let speedStretchX = 1 + (Math.abs(this.vx) * 0.02);
+                let speedStretchY = 1 + (Math.abs(this.vy) * 0.02);
+                
+                // Tilt logic
+                if (Math.abs(this.vx) > 1 || Math.abs(this.vy) > 1) {
+                    let angle = Math.atan2(this.vy, this.vx * 2); 
+                    if (!this.grounded) {
+                        ctx.rotate(angle * 0.5); 
+                    }
+                }
+
+                ctx.scale(this.squash.x * speedStretchX, this.squash.y / speedStretchX); 
+
+                // MINIMALIST DESIGN: Clean Solid Square with Glow
+                ctx.shadowColor = c.hex;
+                ctx.shadowBlur = 15;
+
+                ctx.fillStyle = c.hex;
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                
+                // Main Shape
+                ctx.beginPath();
+                ctx.rect(-this.w/2, -this.h/2, this.w, this.h);
+                ctx.fill();
+                ctx.stroke();
+
+                // Inner detail (small white center)
+                ctx.fillStyle = '#fff';
+                ctx.shadowBlur = 0;
+                ctx.fillRect(-4, -4, 8, 8);
+
+                ctx.restore();
+            }
+        }
+
+        // --- VISUALS ---
+
+        class Shout {
+            constructor(x, y, text) {
+                this.x = x; this.y = y; this.text = text;
+                this.life = 1.0;
+                this.vy = -2;
+            }
+            update() {
+                this.y += this.vy;
+                this.life -= 0.02;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.translate(this.x, this.y);
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = "bold 20px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText(this.text, 0, 0);
+                
+                ctx.restore();
+            }
+        }
+
+        function createShout(x, y, text) {
+            state.shouts.push(new Shout(x, y, text));
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y; this.color = color;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 5 + 2;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.05 + 0.02;
+                this.size = Math.random() * 4 + 2;
+            }
+            update() {
+                this.x += this.vx * state.timeScale;
+                this.y += this.vy * state.timeScale;
+                this.life -= this.decay;
+                this.size *= 0.95;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.translate(this.x, this.y);
+                ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+                ctx.restore();
+            }
+        }
+
+        function createParticles(x, y, color, count) {
+            for(let i=0; i<count; i++) state.particles.push(new Particle(x, y, color));
+        }
+
+        // --- LEVEL DESIGN (Beginner Friendly) ---
+
+        function initLevel() {
+            state.platforms = [];
+            state.player = new Player(100, 300);
+            
+            const add = (x, y, w, h, c) => state.platforms.push({x, y, w, h, color: c, highlight: false});
+
+            // 1. Safe Zone
+            add(50, 400, 600, 40, 1); 
+
+            // 2. Simple Steps
+            add(650, 350, 150, 30, 2); 
+            add(800, 300, 150, 30, 3); 
+            add(950, 250, 150, 30, 4); 
+
+            // 3. First Gap
+            add(1100, 400, 500, 40, 1); 
+            add(1200, 200, 100, 30, 2); 
+            
+            // 4. Wall Climb
+            add(1400, 150, 40, 300, 3); 
+            add(1550, 50, 40, 300, 4);  
+            
+            // 5. GLITCH TRAINING
+            add(1700, 450, 800, 40, 1); 
+            
+            // Glitch Block (Big)
+            add(2100, 300, 150, 150, 2); 
+
+            // Target
+            add(2400, 100, 400, 30, 3);
+
+            // 6. Victory Run
+            add(2900, 150, 200, 30, 4);
+            add(3200, 200, 200, 30, 1);
+            
+            // Goal
+            add(3500, 200, 300, 40, 2); 
+        }
+
+        // --- CORE LOOP ---
+
+        function update() {
+            if (!state.running) return;
+
+            // Camera Smoothing
+            let targetX = state.player.x - GAME_WIDTH * 0.3 + (state.player.vx * 15);
+            let targetY = state.player.y - GAME_HEIGHT * 0.5 + (state.player.vy * 5);
+            
+            state.camera.x += (targetX - state.camera.x) * 0.08; 
+            state.camera.y += (targetY - state.camera.y) * 0.08;
+            
+            if (state.camera.shake > 0) {
+                state.camera.x += (Math.random() - 0.5) * state.camera.shake;
+                state.camera.y += (Math.random() - 0.5) * state.camera.shake;
+                state.camera.shake *= 0.85;
+                if (state.camera.shake < 0.5) state.camera.shake = 0;
+            }
+
+            state.player.update();
+
+            // Particles
+            for (let i = state.particles.length - 1; i >= 0; i--) {
+                state.particles[i].update();
+                if (state.particles[i].life <= 0) state.particles.splice(i, 1);
+            }
+
+            // Shouts
+            for (let i = state.shouts.length - 1; i >= 0; i--) {
+                state.shouts[i].update();
+                if (state.shouts[i].life <= 0) state.shouts.splice(i, 1);
+            }
+
+            state.elapsed = (Date.now() - state.startTime) / 1000;
+            document.getElementById('timerDisplay').innerText = state.elapsed.toFixed(2);
+            document.getElementById('velocityDisplay').innerText = Math.round(Math.abs(state.player.vx) * 10) + " km/h";
+
+            if (state.player.x > 3500 && state.player.grounded && !state.victory) {
+                winGame();
+            }
+        }
+
+        function draw() {
+            // Background - Minimalist Dark
+            ctx.fillStyle = state.discoMode ? `hsl(${state.discoTimer % 360}, 50%, 10%)` : '#050505';
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            // Subtle Grid
+            ctx.save();
+            ctx.strokeStyle = '#1a1a1a';
+            ctx.lineWidth = 2;
+            let gridOffset = -(state.camera.x * 0.5) % 100;
+            ctx.beginPath();
+            for(let x=gridOffset; x<GAME_WIDTH; x+=100) { 
+                ctx.moveTo(x, 0); ctx.lineTo(x, GAME_HEIGHT);
+            }
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.save();
+            ctx.translate(-state.camera.x, -state.camera.y);
+
+            // Tutorial Text (Minimalist)
+            ctx.font = "bold 20px monospace";
+            ctx.fillStyle = "#666";
+            ctx.fillText("WASD/Arrows to Move", 100, 350);
+            ctx.fillText("1-2-3-4 Switch Color", 700, 200); 
+            
+            ctx.fillStyle = "#33ff33"; 
+            ctx.fillText("ENTER GREEN BOX...", 2175, 250);
+            ctx.fillText("...SWITCH GREEN INSIDE!", 2175, 280);
+
+            // Platforms (Minimalist Style)
+            for (let p of state.platforms) {
+                let isActive = state.player.color === p.color;
+                let c = PALETTE[p.color];
+
+                ctx.save();
+                
+                if (isActive) {
+                    // Solid Glow Block
+                    ctx.shadowColor = c.hex;
+                    ctx.shadowBlur = 10;
+                    ctx.fillStyle = c.hex;
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    
+                    // Inner Highlight
+                    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                    ctx.fillRect(p.x, p.y, p.w, 4);
+                } else {
+                    // Hollow Outline
+                    ctx.strokeStyle = c.hex;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(p.x, p.y, p.w, p.h);
+                    
+                    // Subtle Hatching
+                    ctx.globalAlpha = 0.2;
+                    ctx.beginPath();
+                    for(let i=0; i<p.w; i+=10) {
+                        ctx.moveTo(p.x+i, p.y);
+                        ctx.lineTo(p.x+i-10, p.y+p.h);
+                    }
+                    ctx.stroke();
+
+                    if (p.highlight) {
+                        ctx.globalAlpha = 1.0;
+                        ctx.strokeStyle = '#fff';
+                        ctx.setLineDash([5, 5]);
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(p.x - 4, p.y - 4, p.w + 8, p.h + 8);
+                        
+                        ctx.fillStyle = '#fff';
+                        ctx.font = "bold 16px monospace";
+                        ctx.textAlign = "center";
+                        ctx.fillText("PRESS " + p.color, p.x + p.w/2, p.y - 15);
+                    }
+                }
+                ctx.restore();
+            }
+
+            for (let p of state.particles) p.draw(ctx);
+            state.player.draw(ctx);
+            for (let s of state.shouts) s.draw(ctx);
+
+            if (state.victory) {
+                ctx.fillStyle = '#fff';
+                ctx.font = "bold 60px monospace";
+                ctx.fillText("COURSE COMPLETE", 3500, -80);
+            }
+
+            ctx.restore();
+
+            requestAnimationFrame(loop);
+        }
+
+        function loop() {
+            update();
+            draw();
+        }
+
+        // --- INPUT & STATE MANAGEMENT ---
+
+        function startGame() {
+            document.getElementById('menuOverlay').classList.add('hidden');
+            resetLevel();
+            state.running = true;
+            loop();
+        }
+
+        function resetLevel() {
+            initLevel();
+            state.startTime = Date.now();
+            state.victory = false;
+            state.camera.x = 0; 
+            state.camera.y = 0;
+            state.particles = [];
+            state.shouts = [];
+            state.discoMode = false;
+            updateUIKeys(1);
+        }
+
+        function winGame() {
+            state.victory = true;
+            state.running = false;
+            document.getElementById('menuOverlay').classList.remove('hidden');
+            document.querySelector('#menuOverlay h1').innerText = "TIME: " + state.elapsed.toFixed(2) + "s";
+            document.querySelector('#menuOverlay button').innerText = "RETRY";
+        }
+
+        function updateUIKeys(activeId) {
+            for(let i=1; i<=4; i++) {
+                const el = document.getElementById('key'+i);
+                if (i === activeId) {
+                    el.classList.add('active');
+                    el.style.backgroundColor = 'transparent';
+                    el.style.borderColor = '#fff';
+                    el.style.color = '#fff';
+                } else {
+                    el.classList.remove('active');
+                    el.style.backgroundColor = 'transparent';
+                    el.style.borderColor = '#555';
+                    el.style.color = PALETTE[i].hex;
+                }
+            }
+        }
+
+        // KONAMI CODE DETECTOR
+        const konamiCode = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","KeyB","KeyA"];
+        let konamiIndex = 0;
+
+        window.addEventListener('keydown', e => {
+            state.keys[e.code] = true;
+            if (['Digit1','Digit2','Digit3','Digit4'].includes(e.code)) {
+                state.player.switchColor(parseInt(e.key));
+            }
+
+            if (e.code === konamiCode[konamiIndex]) {
+                konamiIndex++;
+                if (konamiIndex === konamiCode.length) {
+                    activateDiscoMode();
+                    konamiIndex = 0;
+                }
+            } else {
+                konamiIndex = 0;
+            }
+        });
+
+        window.addEventListener('keyup', e => state.keys[e.code] = false);
+
+        function activateDiscoMode() {
+            state.discoMode = !state.discoMode;
+            const notif = document.getElementById('notification');
+            notif.classList.add('show');
+            setTimeout(() => notif.classList.remove('show'), 2000);
+            if (state.discoMode) {
+                createShout(state.player.x, state.player.y - 50, "PARTY MODE");
+            }
+        }
+
+        // Init
+        initLevel();
+
+    </script>
+</body>
+</html>
