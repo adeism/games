@@ -1,0 +1,1727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Stitch Runner - Extreme Sewing Action</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Space+Mono:wght@700&display=swap');
+        body {
+            font-family: 'Fredoka', sans-serif;
+            touch-action: none;
+            overflow: hidden;
+            background-color: #121214;
+        }
+        .mono {
+            font-family: 'Space Mono', monospace;
+        }
+        /* Custom scrollbar just in case */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen text-slate-800 selection:bg-rose-200">
+
+    <!-- MAIN GAME CONTAINER -->
+    <div id="game-container" class="relative w-full max-w-[450px] h-[100dvh] md:h-[800px] md:rounded-3xl overflow-hidden bg-[#F4F1EB] shadow-2xl flex flex-col border-4 border-[#D4C3A3]">
+        
+        <!-- CANVAS BACKDROP -->
+        <canvas id="gameCanvas" class="absolute inset-0 w-full h-full block z-0"></canvas>
+
+        <!-- TOP HEADS UP DISPLAY (PLAYING & PAUSED) -->
+        <div id="hud-overlay" class="absolute top-0 inset-x-0 p-4 z-10 flex flex-col pointer-events-none transition-all duration-300 transform -translate-y-12 opacity-0">
+            <div class="flex justify-between items-center">
+                <!-- XP & Level Badge -->
+                <div class="bg-white/95 backdrop-blur shadow-md px-3 py-1.5 rounded-full border border-amber-200 flex items-center space-x-2 pointer-events-auto">
+                    <span id="hud-level-badge" class="bg-rose-500 text-white font-bold text-sm px-2 py-0.5 rounded-full">Lv.1</span>
+                    <div class="w-16 h-3 bg-slate-200 rounded-full overflow-hidden relative">
+                        <div id="hud-xp-bar" class="h-full bg-emerald-400 transition-all duration-200" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Active Score & Streak Combo -->
+                <div class="flex flex-col items-end">
+                    <div class="bg-white/95 backdrop-blur shadow-md px-4 py-1 rounded-full border border-amber-200 flex items-center space-x-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Score</span>
+                        <span id="hud-score" class="mono text-lg font-bold text-slate-800">00000</span>
+                    </div>
+                    <div id="hud-combo-container" class="mt-1 transition-all duration-200 transform scale-0 opacity-0">
+                        <span id="hud-combo" class="bg-amber-400 text-slate-900 text-xs font-black px-2.5 py-0.5 rounded-full shadow border border-white uppercase tracking-wider animate-bounce">1x Streak</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Skill Status Bar -->
+            <div class="mt-2 flex justify-between items-center pointer-events-auto">
+                <div class="flex gap-2">
+                    <!-- Skill 1 Icon & Cooldown -->
+                    <button id="btn-skill-1" class="relative w-12 h-12 bg-white/90 border-2 border-amber-400 rounded-xl shadow-md flex flex-col items-center justify-center cursor-pointer overflow-hidden group">
+                        <div id="skill-1-cooldown-ring" class="absolute inset-0 bg-slate-900/60 flex items-center justify-center text-white font-bold text-xs" style="height: 0%"></div>
+                        <span class="text-lg">🧲</span>
+                        <span class="text-[8px] font-bold text-slate-600">Magnet</span>
+                    </button>
+                    <!-- Skill 2 Icon & Cooldown -->
+                    <button id="btn-skill-2" class="relative w-12 h-12 bg-white/90 border-2 border-indigo-400 rounded-xl shadow-md flex flex-col items-center justify-center cursor-pointer overflow-hidden group">
+                        <div id="skill-2-cooldown-ring" class="absolute inset-0 bg-slate-900/60 flex items-center justify-center text-white font-bold text-xs" style="height: 0%"></div>
+                        <span class="text-lg">⚡</span>
+                        <span class="text-[8px] font-bold text-slate-600">Dash</span>
+                    </button>
+                    <!-- Skill 3 Icon & Cooldown -->
+                    <button id="btn-skill-3" class="relative w-12 h-12 bg-white/90 border-2 border-rose-400 rounded-xl shadow-md flex flex-col items-center justify-center cursor-pointer overflow-hidden group">
+                        <div id="skill-3-cooldown-ring" class="absolute inset-0 bg-slate-900/60 flex items-center justify-center text-white font-bold text-xs" style="height: 0%"></div>
+                        <span class="text-lg">⏳</span>
+                        <span class="text-[8px] font-bold text-slate-600">Slow</span>
+                    </button>
+                </div>
+
+                <!-- Threads count/shield indicator -->
+                <div class="flex space-x-1 bg-white/95 px-3 py-1.5 rounded-full border border-amber-200 shadow-sm items-center">
+                    <span class="text-sm">🧵</span>
+                    <div id="hud-lives" class="flex space-x-1">
+                        <span class="text-rose-500">❤️</span>
+                        <span class="text-rose-500">❤️</span>
+                        <span class="text-rose-500">❤️</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- START MENU SCREEN -->
+        <div id="start-menu" class="absolute inset-0 z-20 flex flex-col justify-between p-6 bg-[#F4F1EB]/95 transition-all duration-300">
+            <!-- Brand / Header -->
+            <div class="text-center mt-8">
+                <span class="bg-amber-100 text-amber-800 text-xs font-semibold px-3 py-1 rounded-full border border-amber-300 uppercase tracking-widest">Avant-Garde Arcade</span>
+                <h1 class="text-4xl font-black text-slate-800 mt-2 tracking-tight flex items-center justify-center gap-1">
+                    STITCH <span class="text-rose-500">RUNNER</span>
+                </h1>
+                <p class="text-sm text-slate-500 mt-1 italic font-medium">Extreme high-speed fabric tailoring chaos</p>
+            </div>
+
+            <!-- Game Overview / Mini Guide -->
+            <div class="bg-white/80 border-2 border-dashed border-amber-300 rounded-2xl p-4 my-auto shadow-sm">
+                <h3 class="font-bold text-slate-700 text-sm border-b border-dashed border-slate-200 pb-1.5 mb-2 flex items-center gap-1.5">
+                    <span>📜</span> MINI SEWING GUIDE:
+                </h3>
+                <ul class="text-xs text-slate-600 space-y-2 font-medium">
+                    <li class="flex items-start gap-1.5">
+                        <span class="text-emerald-500">✔</span>
+                        <span><strong>GOAL:</strong> Thread needle through buttons & holes. Avoid pins & scissors!</span>
+                    </li>
+                    <li class="flex items-start gap-1.5">
+                        <span class="text-indigo-500">✔</span>
+                        <span><strong>CONTROLS:</strong> Drag screen/Mouse to move left/right. Tap Skill buttons to trigger.</span>
+                    </li>
+                    <li class="flex items-start gap-1.5">
+                        <span class="text-rose-500">✔</span>
+                        <span><strong>LOSE:</strong> Needle snaps if you collide with metal pins or boundary zippers.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Scoreboard -->
+            <div class="text-center my-2">
+                <div class="inline-block bg-slate-800 text-amber-300 rounded-2xl px-5 py-2.5 shadow-md">
+                    <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Personal Best Score</span>
+                    <span id="best-score-display" class="mono text-2xl font-black">00000</span>
+                </div>
+            </div>
+
+            <!-- Start Button Area -->
+            <div class="mb-8 flex flex-col items-center">
+                <button id="btn-start" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold text-xl py-4 px-8 rounded-2xl shadow-lg border-b-4 border-rose-700 transform active:scale-95 transition-all cursor-pointer flex items-center justify-center space-x-2">
+                    <span>🧵</span> <span>START STITCHING</span>
+                </button>
+                <p class="text-[10px] text-slate-400 mt-2 uppercase tracking-widest font-semibold">Taps start. Init synth audio.</p>
+            </div>
+        </div>
+
+        <!-- NEW COSMETIC / SKILL UNLOCKED MODAL (CELEBRATORY overlay) -->
+        <div id="unlock-modal" class="absolute inset-x-4 top-1/4 z-30 bg-white/95 border-4 border-amber-400 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center scale-0 opacity-0 transition-all duration-300 pointer-events-none">
+            <span class="text-4xl animate-bounce">🎉</span>
+            <h2 class="text-2xl font-black text-slate-800 mt-2">LEVEL UP!</h2>
+            <p id="unlock-level-text" class="text-sm font-bold text-rose-500">Reached Level 2</p>
+            <div class="my-4 p-4 bg-amber-50 rounded-2xl border border-amber-200 w-full">
+                <span class="text-xs font-bold text-amber-800 uppercase tracking-widest block mb-1">Unlocks Unravelled</span>
+                <h3 id="unlock-item-name" class="font-bold text-slate-800 text-lg">Rainbow Thread</h3>
+                <p id="unlock-item-desc" class="text-xs text-slate-500 mt-1">Leaves a trailing rainbow trail</p>
+            </div>
+            <button id="btn-close-unlock" class="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2.5 rounded-full font-bold text-sm pointer-events-auto cursor-pointer active:scale-95 transition-all">
+                FABULOUS!
+            </button>
+        </div>
+
+        <!-- GAMEOVER SCREEN -->
+        <div id="gameover-menu" class="absolute inset-0 z-20 flex flex-col justify-between p-6 bg-slate-900/95 text-white transition-all duration-300 transform scale-105 opacity-0 pointer-events-none">
+            <!-- Header -->
+            <div class="text-center mt-8">
+                <span class="bg-rose-500/20 text-rose-300 text-xs font-semibold px-3 py-1 rounded-full border border-rose-500/30 uppercase tracking-widest">Needle Snapped!</span>
+                <h1 class="text-4xl font-black text-white mt-2 tracking-tight">GAME OVER</h1>
+                <p class="text-sm text-slate-400 mt-1 italic font-medium">Your thread cut deep, but stitching broke</p>
+            </div>
+
+            <!-- Stats Recap -->
+            <div class="bg-white/10 border border-white/20 rounded-2xl p-6 space-y-4 my-auto">
+                <div class="flex justify-between items-center border-b border-white/10 pb-2">
+                    <span class="text-sm text-slate-300 font-semibold">Final Score</span>
+                    <span id="go-score" class="mono text-2xl font-bold text-amber-300">0</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-white/10 pb-2">
+                    <span class="text-sm text-slate-300 font-semibold">Stitches Sewn</span>
+                    <span id="go-stitches" class="mono text-lg font-bold text-white">0</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-white/10 pb-2">
+                    <span class="text-sm text-slate-300 font-semibold">Peak Level Reached</span>
+                    <span id="go-level" class="mono text-lg font-bold text-rose-400">Lv.1</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-slate-300 font-semibold">New High Score?</span>
+                    <span id="go-highscore-badge" class="bg-emerald-500 text-slate-900 text-[10px] font-black px-2.5 py-0.5 rounded-full shadow border border-white uppercase tracking-wider hidden">NEW BEST!</span>
+                    <span id="go-normal-badge" class="text-xs text-slate-400 font-semibold">Try again</span>
+                </div>
+            </div>
+
+            <!-- Actions Area -->
+            <div class="mb-8 flex flex-col items-center">
+                <button id="btn-restart" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-black text-xl py-4 px-8 rounded-2xl shadow-lg border-b-4 border-emerald-700 transform active:scale-95 transition-all cursor-pointer flex items-center justify-center space-x-2">
+                    <span>⚡</span> <span>RE-THREAD & START</span>
+                </button>
+                <p class="text-[10px] text-slate-500 mt-2 uppercase tracking-widest font-semibold">Instant restart < 1s</p>
+            </div>
+        </div>
+
+        <!-- NOTIFICATION BANNER (Near-misses or game notifications) -->
+        <div id="toast-banner" class="absolute top-16 left-1/2 transform -translate-x-1/2 z-20 bg-amber-400 text-slate-900 font-bold text-xs py-1 px-3 rounded-full shadow border border-white uppercase tracking-wider transition-all duration-300 scale-0 opacity-0 pointer-events-none">
+            NEAR MISS! +100
+        </div>
+    </div>
+
+    <!-- CORE GAME LOGIC -->
+    <script>
+        /*
+        GAME: STITCH RUNNER
+        CONCEPT: Thread needle through endless scrolling fabric buttonholes, avoid pins/scissors.
+        WHY ADDICTING: Cozy aesthetic meets extreme precision sewing speed. Verlet physics dynamic thread sways, snaps, and can be snipped by scissors. Active skills change gameplay mechanics instantly.
+        CONTROLS: Drag mouse or finger to slide needle left/right. Click HUD buttons or tap corresponding area to trigger active skills.
+        MINI GUIDE: Goal: thread buttons/holes, dodge pins. Controls: drag horizontally, trigger active skills. Lose: needle snaps.
+        */
+
+        // Procedural Audio Synthesizer Class (No external assets)
+        class AudioSynth {
+            constructor() {
+                this.ctx = null;
+                this.master = null;
+            }
+
+            init() {
+                if (this.ctx) return;
+                try {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    this.master = this.ctx.createGain();
+                    this.master.gain.setValueAtTime(0.12, this.ctx.currentTime); // Soft cozy volume
+                    this.master.connect(this.ctx.destination);
+                } catch(e) {
+                    console.error("Audio Context initialisation failed", e);
+                }
+            }
+
+            resume() {
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playStart() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const chord = [261.63, 329.63, 392.00, 523.25]; // C major
+                chord.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gainNode = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + (idx * 0.05));
+                    
+                    gainNode.gain.setValueAtTime(0, now);
+                    gainNode.gain.linearRampToValueAtTime(0.1, now + (idx * 0.05) + 0.02);
+                    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+                    
+                    osc.connect(gainNode);
+                    gainNode.connect(this.master);
+                    osc.start(now + (idx * 0.05));
+                    osc.stop(now + 0.6);
+                });
+            }
+
+            playAction() { // Needle pierce sound
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                // Soft "thwip" noise burst
+                const bufferSize = this.ctx.sampleRate * 0.05; // 50ms noise
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(800, now);
+                filter.frequency.exponentialRampToValueAtTime(100, now + 0.04);
+
+                const gainNode = this.ctx.createGain();
+                gainNode.gain.setValueAtTime(0.15, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+
+                noise.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(this.master);
+                noise.start(now);
+                noise.stop(now + 0.05);
+            }
+
+            playScore(streak = 1) { // Pin / button score chime, pitch rises with streak
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gainNode = this.ctx.createGain();
+
+                osc.type = 'sine';
+                // Exponential frequency growth based on streak
+                const baseFreq = 523.25; // C5
+                const factor = Math.pow(1.05946, Math.min(streak, 16)); 
+                const targetFreq = baseFreq * factor;
+
+                osc.frequency.setValueAtTime(targetFreq, now);
+                osc.frequency.linearRampToValueAtTime(targetFreq * 1.5, now + 0.1);
+
+                gainNode.gain.setValueAtTime(0.15, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+
+                osc.connect(gainNode);
+                gainNode.connect(this.master);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+
+            playCombo() { // Streak milestone fanfare
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // Rapid C major sweep
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gainNode = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.04);
+                    
+                    gainNode.gain.setValueAtTime(0.08, now + idx * 0.04);
+                    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.04 + 0.15);
+
+                    osc.connect(gainNode);
+                    gainNode.connect(this.master);
+                    osc.start(now + idx * 0.04);
+                    osc.stop(now + idx * 0.04 + 0.15);
+                });
+            }
+
+            playNearMiss() { // Scraping metallic warning
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc1 = this.ctx.createOscillator();
+                const osc2 = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc1.type = 'sawtooth';
+                osc1.frequency.setValueAtTime(800, now);
+                osc1.frequency.linearRampToValueAtTime(200, now + 0.15);
+
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(850, now);
+                osc2.frequency.linearRampToValueAtTime(220, now + 0.15);
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(1200, now);
+
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+
+                osc1.connect(filter);
+                osc2.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.master);
+
+                osc1.start(now);
+                osc2.start(now);
+                osc1.stop(now + 0.15);
+                osc2.stop(now + 0.15);
+            }
+
+            playDeath() { // Metallic snap of the needle
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                // High tension low pitch thud + high pass snap
+                const osc = this.ctx.createOscillator();
+                const gainNode = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
+
+                gainNode.gain.setValueAtTime(0.25, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+
+                osc.connect(gainNode);
+                gainNode.connect(this.master);
+                osc.start(now);
+                osc.stop(now + 0.3);
+
+                // Add snap noise
+                const bufferSize = this.ctx.sampleRate * 0.1;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+                const noiseFilter = this.ctx.createBiquadFilter();
+                noiseFilter.type = 'highpass';
+                noiseFilter.frequency.setValueAtTime(2000, now);
+
+                const noiseGain = this.ctx.createGain();
+                noiseGain.gain.setValueAtTime(0.2, now);
+                noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+
+                noise.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noiseGain.connect(this.master);
+                noise.start(now);
+                noise.stop(now + 0.1);
+            }
+
+            playHighscore() { // Uplifting ascending chime sequence
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const melody = [523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50];
+                melody.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+
+                    gain.gain.setValueAtTime(0.1, now + idx * 0.08);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.08 + 0.25);
+
+                    osc.connect(gain);
+                    gain.connect(this.master);
+                    osc.start(now + idx * 0.08);
+                    osc.stop(now + idx * 0.08 + 0.25);
+                });
+            }
+
+            playLevelUp() { // Deep electronic filter swell
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const filter = this.ctx.createBiquadFilter();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(130, now);
+                osc.frequency.exponentialRampToValueAtTime(260, now + 0.4);
+
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(100, now);
+                filter.frequency.exponentialRampToValueAtTime(3000, now + 0.4);
+                filter.Q.setValueAtTime(8, now);
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.master);
+
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+
+            playSkillActivate() { // Futuristic zoooop sweep
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gainNode = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.exponentialRampToValueAtTime(1760, now + 0.2);
+
+                gainNode.gain.setValueAtTime(0.15, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+
+                osc.connect(gainNode);
+                gainNode.connect(this.master);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+
+            playSkillFail() { // Low pitch failure buzz
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(110, now);
+                osc.frequency.setValueAtTime(85, now + 0.08);
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+
+                osc.connect(gain);
+                gain.connect(this.master);
+                osc.start(now);
+                osc.stop(now + 0.18);
+            }
+
+            playStreakBreak() { // Descending pitch whistle (cutting thread)
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(150, now + 0.35);
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+
+                osc.connect(gain);
+                gain.connect(this.master);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            }
+
+            playNewMechanicIntro() { // Warning alarm tone pair
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                [380, 395].forEach(freq => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now);
+                    
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+
+                    osc.connect(gain);
+                    gain.connect(this.master);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                });
+            }
+        }
+
+        const sound = new AudioSynth();
+
+        // Object Pool for Particles (Performance efficient)
+        class ParticlePool {
+            constructor() {
+                this.pool = [];
+                this.active = [];
+            }
+            get() {
+                if (this.pool.length > 0) return this.pool.pop();
+                return {
+                    x: 0, y: 0, vx: 0, vy: 0, size: 0, color: '#fff', life: 0, maxLife: 0, type: 'spark'
+                };
+            }
+            spawn(x, y, color, type = 'spark', count = 8) {
+                for (let i = 0; i < count; i++) {
+                    const p = this.get();
+                    p.x = x;
+                    p.y = y;
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 4 + (type === 'puff' ? 1 : 2);
+                    p.vx = Math.cos(angle) * speed;
+                    p.vy = Math.sin(angle) * speed;
+                    p.size = Math.random() * 4 + 2;
+                    p.color = color;
+                    p.life = 1.0;
+                    p.maxLife = type === 'puff' ? 25 : 15;
+                    p.type = type;
+                    this.active.push(p);
+                }
+            }
+            update() {
+                for (let i = this.active.length - 1; i >= 0; i--) {
+                    const p = this.active[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life -= 1 / p.maxLife;
+                    
+                    if (p.type === 'puff') {
+                        p.vy -= 0.05; // float up
+                        p.vx *= 0.95;
+                    } else {
+                        p.vy += 0.1; // gravity
+                    }
+
+                    if (p.life <= 0) {
+                        this.active.splice(i, 1);
+                        this.pool.push(p);
+                    }
+                }
+            }
+            draw(ctx) {
+                for (let i = 0; i < this.active.length; i++) {
+                    const p = this.active[i];
+                    ctx.save();
+                    ctx.globalAlpha = p.life;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    if (p.type === 'star') {
+                        // Tiny diamond
+                        ctx.moveTo(p.x, p.y - p.size);
+                        ctx.lineTo(p.x + p.size, p.y);
+                        ctx.lineTo(p.x, p.y + p.size);
+                        ctx.lineTo(p.x - p.size, p.y);
+                    } else {
+                        // Circle
+                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    }
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+        }
+
+        const particles = new ParticlePool();
+
+        // LEVELING & UNLOCKS METADATA
+        const COSMETIC_UNLOCKS = {
+            1: { name: "Standard Red Yarn", color: "#EF4444", desc: "Starter sewing thread color" },
+            2: { name: "Emerald Stitch", color: "#10B981", desc: "Fresh vibrant green yarn" },
+            3: { name: "Royal Blue Thread", color: "#3B82F6", desc: "Heavy silk cobalt blue" },
+            4: { name: "Golden Lustre", color: "#F59E0B", desc: "Thread of the weaving master" },
+            5: { name: "Neon Fuschia", color: "#EC4899", desc: "Glowing synthetic polymer" },
+            6: { name: "Rainbow Yarn", color: "rainbow", desc: "Phases through colors of nature" },
+            7: { name: "Void Thread", color: "#1E1B4B", desc: "Dark matter yarn of night sky" },
+            8: { name: "Pastel Mint", color: "#A7F3D0", desc: "Calming retro cotton thread" },
+            9: { name: "Ultimate Gold Needle", color: "#FACC15", desc: "Pure prestige woven alloy" },
+            10: { name: "Cosmic Nebula", color: "cosmic", desc: "Colors shifting between dimensions" }
+        };
+
+        const SKILL_UNLOCKS = {
+            3: { slot: 1, name: "Magnet Thread", icon: "🧲", desc: "Pull buttons closer (Press A or Click UI)" },
+            6: { slot: 3, name: "Time Warp", icon: "⏳", desc: "Slow down moving time (Press S or Click UI)" },
+            9: { slot: 2, name: "Stitch Dash", icon: "⚡", desc: "Invincibility dash, destroy pins (Space / Click UI)" }
+        };
+
+        // UI ELEMENTS & INITIAL STATES
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('game-container');
+
+        // State Machine
+        let state = 'MENU'; // 'MENU' | 'PLAYING' | 'GAMEOVER' | 'PAUSED'
+        let score = 0;
+        let highscore = 0;
+        let stitches = 0;
+        let level = 1;
+        let xp = 0;
+        let lives = 3;
+        let globalSpeed = 220; // Scrolling velocity pixels/sec
+        let timeElapsed = 0;
+
+        // Color Themes & Configuration (Contrast-compliant, Named roles)
+        const PALETTE = {
+            bg: '#F4F1EB',          // Felt linen background (contrast 4.5:1 with slate dark)
+            grid: '#E4DEC9',        // Dotted seam grid lines
+            needleSteel: '#94A3B8',  // Sleek chromium needle body
+            pinHead: '#DC2626',      // Dangerous scarlet red glass head
+            pinShaft: '#CBD5E1',     // Pin metallic body
+            buttonGold: '#D97706',   // Rich yellow gold button rim
+            buttonInside: '#F59E0B', // Inner golden surface
+            scissorMetal: '#475569', // Strong dark slate metallic blades
+            dangerOutline: '#EF4444',// Red warnings
+            textColor: '#1E293B',    // Slate-900 high readability
+            success: '#10B981'       // Level-up greens
+        };
+
+        // User Customisations (Unlocked)
+        let activeThreadColor = PALETTE.pinHead;
+        let isRainbowThread = false;
+        let isCosmicThread = false;
+
+        // Needle Physics & Drag Controls
+        let needleX = 225; // Centered
+        let needleY = 560; // 70% down
+        let targetX = 225;
+        let isInvincible = false;
+        let invincibilityTimer = 0;
+
+        // Interactive active skills
+        const SKILL_COOLDOWNS = {
+            1: { active: false, currentCD: 0, duration: 4.0, maxCD: 12.0 }, // Magnet
+            2: { active: false, currentCD: 0, duration: 0.35, maxCD: 6.0 },  // Dash
+            3: { active: false, currentCD: 0, duration: 4.0, maxCD: 18.0 }  // Time slow
+        };
+
+        // Verlet Physics Thread Setup (Organic dangling string)
+        const threadSegments = [];
+        const THREAD_LENGTH = 18;
+        const SEGMENT_DIST = 10;
+        let hasBrokenThread = false;
+        let brokenIndex = -1; // Splitting point if cut by scissors
+
+        function initThread() {
+            threadSegments.length = 0;
+            hasBrokenThread = false;
+            brokenIndex = -1;
+            for (let i = 0; i < THREAD_LENGTH; i++) {
+                threadSegments.push({
+                    x: needleX,
+                    y: needleY + 20 + (i * SEGMENT_DIST),
+                    px: needleX,
+                    py: needleY + 20 + (i * SEGMENT_DIST),
+                    vx: 0,
+                    vy: 0
+                });
+            }
+        }
+
+        // Floating UI notification score pops
+        const floatingTexts = [];
+        function spawnFloatingText(x, y, txt, color = '#F59E0B') {
+            floatingTexts.push({ x, y, txt, color, opacity: 1.0, vy: -1.2 });
+        }
+
+        // Spawning patterns & obstacles
+        let obstacles = [];
+        let nextSpawnTimer = 0.5; // Starts fast
+        let lastSpawnType = '';
+
+        // Dynamic background scrolling grid
+        let backgroundScrollOffset = 0;
+
+        // COMBO & STREAK SYSTEM
+        let streak = 0;
+        let streakDecayTimer = 0;
+        let peakStreak = 0;
+
+        // SCREEN SHAKE FOR JUICY FEELING
+        let screenShake = 0;
+
+        // RESIZING & RESPONSIVE DESIGN
+        function resize() {
+            const rect = container.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            // Place needle relative to canvas height
+            needleY = canvas.height * 0.72;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // SCISSORS WARNING TIMER
+        let scissorWarningActive = false;
+        let scissorWarningSide = 'left'; // 'left' | 'right'
+        let scissorWarningY = 0;
+        let scissorSpawnTimer = 10; // First scissor alert in 10 seconds
+
+        // KEYBOARD MAPPING
+        const keys = {};
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+            // Hotkeys for active skills
+            if (state === 'PLAYING') {
+                if (e.code === 'KeyQ' || e.code === 'KeyA') triggerSkill(1);
+                if (e.code === 'Space' || e.code === 'KeyW') triggerSkill(2);
+                if (e.code === 'KeyE' || e.code === 'KeyD') triggerSkill(3);
+            }
+        });
+        window.addEventListener('keyup', e => {
+            keys[e.code] = false;
+        });
+
+        // MOUSE / TOUCH CONTROL
+        let isPointerDown = false;
+        canvas.addEventListener('pointerdown', e => {
+            isPointerDown = true;
+            const x = getRelativeX(e);
+            targetX = x;
+            sound.resume();
+        });
+        canvas.addEventListener('pointermove', e => {
+            if (isPointerDown) {
+                targetX = getRelativeX(e);
+            }
+        });
+        canvas.addEventListener('pointerup', () => {
+            isPointerDown = false;
+        });
+        canvas.addEventListener('pointercancel', () => {
+            isPointerDown = false;
+        });
+
+        function getRelativeX(e) {
+            const rect = canvas.getBoundingClientRect();
+            let rawX = e.clientX - rect.left;
+            // Clamping inside safe canvas margins
+            return Math.max(15, Math.min(canvas.width - 15, rawX));
+        }
+
+        // DETECT BUTTON INTERFACES (Direct UI)
+        document.getElementById('btn-skill-1').addEventListener('pointerdown', (e) => {
+            e.stopPropagation(); triggerSkill(1);
+        });
+        document.getElementById('btn-skill-2').addEventListener('pointerdown', (e) => {
+            e.stopPropagation(); triggerSkill(2);
+        });
+        document.getElementById('btn-skill-3').addEventListener('pointerdown', (e) => {
+            e.stopPropagation(); triggerSkill(3);
+        });
+
+        document.getElementById('btn-start').addEventListener('pointerdown', () => {
+            sound.init();
+            sound.playStart();
+            startGame();
+        });
+
+        document.getElementById('btn-restart').addEventListener('pointerdown', () => {
+            sound.resume();
+            sound.playStart();
+            startGame();
+        });
+
+        document.getElementById('btn-close-unlock').addEventListener('pointerdown', () => {
+            hideUnlock();
+        });
+
+        // XP QUANTUM & LEVEL FORMULA
+        function calculateXpNeeded(lvl) {
+            // XP formula quadratic: 100 * lvl ^ 1.8
+            return Math.floor(100 * Math.pow(lvl, 1.8));
+        }
+
+        function awardXp(amount) {
+            xp += amount;
+            let needed = calculateXpNeeded(level);
+            while (xp >= needed) {
+                xp -= needed;
+                level++;
+                needed = calculateXpNeeded(level);
+                handleLevelUp();
+            }
+            updateHud();
+        }
+
+        function handleLevelUp() {
+            sound.playLevelUp();
+            screenShake = 12;
+
+            // Trigger modal celebrator
+            const unlockText = document.getElementById('unlock-level-text');
+            const itemTitle = document.getElementById('unlock-item-name');
+            const itemDesc = document.getElementById('unlock-item-desc');
+            const modal = document.getElementById('unlock-modal');
+
+            unlockText.innerText = `REACHED LEVEL ${level}`;
+
+            let cosmicReward = COSMETIC_UNLOCKS[level];
+            let skillReward = SKILL_UNLOCKS[level];
+
+            if (cosmicReward) {
+                itemTitle.innerText = `COSMETIC: ${cosmicReward.name}`;
+                itemDesc.innerText = cosmicReward.desc;
+                if (cosmicReward.color === 'rainbow') {
+                    isRainbowThread = true;
+                    isCosmicThread = false;
+                } else if (cosmicReward.color === 'cosmic') {
+                    isCosmicThread = true;
+                    isRainbowThread = false;
+                } else {
+                    activeThreadColor = cosmicReward.color;
+                    isRainbowThread = false;
+                    isCosmicThread = false;
+                }
+            } else if (skillReward) {
+                itemTitle.innerText = `ACTIVE SKILL: ${skillReward.name}`;
+                itemDesc.innerText = skillReward.desc;
+            } else {
+                itemTitle.innerText = "Spool of Extra Thread";
+                itemDesc.innerText = "Highly durable golden fibers awarded!";
+            }
+
+            modal.classList.remove('scale-0', 'opacity-0', 'pointer-events-none');
+            modal.classList.add('scale-100', 'opacity-100', 'pointer-events-auto');
+            state = 'PAUSED';
+        }
+
+        function hideUnlock() {
+            const modal = document.getElementById('unlock-modal');
+            modal.classList.remove('scale-100', 'opacity-100', 'pointer-events-auto');
+            modal.classList.add('scale-0', 'opacity-0', 'pointer-events-none');
+            state = 'PLAYING';
+        }
+
+        // CORE GAME STATE TRANSITIONS
+        function startGame() {
+            score = 0;
+            stitches = 0;
+            lives = 3;
+            timeElapsed = 0;
+            globalSpeed = 220;
+            streak = 0;
+            streakDecayTimer = 0;
+            hasBrokenThread = false;
+            brokenIndex = -1;
+            obstacles = [];
+            nextSpawnTimer = 0.5;
+            scissorWarningActive = false;
+            scissorSpawnTimer = 10;
+
+            // Reset skills
+            for (let k in SKILL_COOLDOWNS) {
+                SKILL_COOLDOWNS[k].active = false;
+                SKILL_COOLDOWNS[k].currentCD = 0;
+            }
+
+            needleX = canvas.width / 2;
+            targetX = needleX;
+            initThread();
+
+            // Slide overlays
+            document.getElementById('start-menu').style.transform = 'translateY(-100%)';
+            document.getElementById('gameover-menu').classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('hud-overlay').classList.remove('-translate-y-12', 'opacity-0');
+
+            state = 'PLAYING';
+            updateHud();
+        }
+
+        function triggerGameOver() {
+            sound.playDeath();
+            screenShake = 15;
+            state = 'GAMEOVER';
+
+            let isNewHigh = false;
+            if (score > highscore) {
+                highscore = score;
+                isNewHigh = true;
+                sound.playHighscore();
+            }
+
+            document.getElementById('go-score').innerText = score;
+            document.getElementById('go-stitches').innerText = stitches;
+            document.getElementById('go-level').innerText = `Lv.${level}`;
+
+            const bestDisplay = document.getElementById('best-score-display');
+            bestDisplay.innerText = String(highscore).padStart(5, '0');
+
+            if (isNewHigh) {
+                document.getElementById('go-highscore-badge').classList.remove('hidden');
+                document.getElementById('go-normal-badge').classList.add('hidden');
+            } else {
+                document.getElementById('go-highscore-badge').classList.add('hidden');
+                document.getElementById('go-normal-badge').classList.remove('hidden');
+            }
+
+            document.getElementById('gameover-menu').classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function updateHud() {
+            document.getElementById('hud-level-badge').innerText = `Lv.${level}`;
+            const needed = calculateXpNeeded(level);
+            const pct = Math.min(100, (xp / needed) * 100);
+            document.getElementById('hud-xp-bar').style.width = `${pct}%`;
+            document.getElementById('hud-score').innerText = String(score).padStart(5, '0');
+
+            // Render hearts
+            let heartStr = '';
+            for (let i = 0; i < lives; i++) {
+                heartStr += '❤️';
+            }
+            document.getElementById('hud-lives').innerHTML = heartStr || '💀';
+
+            // Active combo
+            const comboContainer = document.getElementById('hud-combo-container');
+            if (streak > 1) {
+                document.getElementById('hud-combo').innerText = `${streak}x STREAK`;
+                comboContainer.classList.remove('scale-0', 'opacity-0');
+                comboContainer.classList.add('scale-100', 'opacity-100');
+            } else {
+                comboContainer.classList.remove('scale-100', 'opacity-100');
+                comboContainer.classList.add('scale-0', 'opacity-0');
+            }
+
+            // Update skill button visual availability
+            const btn1 = document.getElementById('btn-skill-1');
+            const btn2 = document.getElementById('btn-skill-2');
+            const btn3 = document.getElementById('btn-skill-3');
+
+            if (level < 3) {
+                btn1.classList.add('opacity-40', 'cursor-not-allowed');
+                btn1.title = "Unlocks at Level 3";
+            } else {
+                btn1.classList.remove('opacity-40', 'cursor-not-allowed');
+                btn1.title = "Magnet Thread (Press A)";
+            }
+
+            if (level < 9) {
+                btn2.classList.add('opacity-40', 'cursor-not-allowed');
+                btn2.title = "Unlocks at Level 9";
+            } else {
+                btn2.classList.remove('opacity-40', 'cursor-not-allowed');
+                btn2.title = "Stitch Dash (Press Space)";
+            }
+
+            if (level < 6) {
+                btn3.classList.add('opacity-40', 'cursor-not-allowed');
+                btn3.title = "Unlocks at Level 6";
+            } else {
+                btn3.classList.remove('opacity-40', 'cursor-not-allowed');
+                btn3.title = "Time Slow (Press D)";
+            }
+        }
+
+        // TRIGGER ACTIVE SKILLS (3 mechanics changing gameplay)
+        function triggerSkill(num) {
+            if (state !== 'PLAYING') return;
+
+            // Check level unlock boundaries
+            if (num === 1 && level < 3) { sound.playSkillFail(); return; }
+            if (num === 2 && level < 9) { sound.playSkillFail(); return; }
+            if (num === 3 && level < 6) { sound.playSkillFail(); return; }
+
+            const sc = SKILL_COOLDOWNS[num];
+            if (sc.currentCD > 0 || sc.active) {
+                sound.playSkillFail();
+                return;
+            }
+
+            // Fire sound
+            sound.playSkillActivate();
+            sc.active = true;
+            sc.currentCD = sc.maxCD;
+
+            if (num === 2) {
+                // Dash: immediate forward force, temporary invulnerability
+                isInvincible = true;
+                invincibilityTimer = sc.duration;
+                particles.spawn(needleX, needleY, '#818CF8', 'star', 12);
+            }
+        }
+
+        // COLOR RENDER HELPER (Rainbows / Cosmic space dust)
+        function getThreadColor(offsetFactor = 0) {
+            if (isRainbowThread) {
+                const hue = (Date.now() * 0.15 + (offsetFactor * 30)) % 360;
+                return `hsl(${hue}, 90%, 55%)`;
+            }
+            if (isCosmicThread) {
+                const blend = Math.sin((Date.now() * 0.002) + (offsetFactor * 0.5)) * 0.5 + 0.5;
+                // Transition indigo to bright purple pink
+                return blend > 0.5 ? '#818CF8' : '#F43F5E';
+            }
+            return activeThreadColor;
+        }
+
+        // OBSTACLE PATTERNS & UPDATE ENGINE
+        function spawnObstacle() {
+            const r = Math.random();
+            const margin = 55;
+            const px = margin + Math.random() * (canvas.width - margin * 2);
+
+            let type = 'buttonhole';
+            // Scale pattern choices over difficulty speed levels
+            if (r < 0.45) {
+                type = 'buttonhole';
+            } else if (r < 0.80) {
+                type = 'button';
+            } else {
+                type = 'pin';
+            }
+
+            // Prevent repetitive pins for fair core loops
+            if (type === 'pin' && lastSpawnType === 'pin') {
+                type = 'buttonhole';
+            }
+            lastSpawnType = type;
+
+            const obs = {
+                id: Date.now() + Math.random(),
+                x: px,
+                y: -60,
+                type: type,
+                width: type === 'button' ? 52 : (type === 'buttonhole' ? 64 : 10),
+                height: type === 'button' ? 52 : (type === 'buttonhole' ? 18 : 55),
+                passed: false,
+                buttonType: Math.random() > 0.5 ? 'standard' : 'fancy',
+                coinMagnetized: false,
+                isMetalPin: type === 'pin'
+            };
+
+            obstacles.push(obs);
+        }
+
+        // COLLISION CHECK BETWEEN LINE SEGMENTS (Necessary for scissors vs Verlet yarn)
+        function lineIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+            const det = (x2 - x1) * (y4 - y3) - (y2 - y1) * (x4 - x3);
+            if (det === 0) return false;
+            const lambda = ((y4 - y3) * (x4 - x1) + (x3 - x4) * (y4 - y1)) / det;
+            const gamma = ((y1 - y2) * (x4 - x1) + (x1 - x2) * (y4 - y1)) / det;
+            return (0 < lambda && lambda < 1) && (0 < gamma && gamma < 1);
+        }
+
+// TICK ENGINE GAME LOOP (EXACT COMPLIANCE WITH LAW)
+const TICK = 1000/60;
+let acc = 0; let lastTs = 0;
+function loop(ts) {
+acc += ts - lastTs; lastTs = ts;
+while (acc >= TICK) { update(TICK / 1000); acc -= TICK; }
+render(); requestAnimationFrame(loop);
+}
+
+        // UPDATE GAME LOGIC (Time step delta)
+        function update(dt) {
+            if (state !== 'PLAYING') return;
+
+            timeElapsed += dt;
+            // Endless speed escalation: 5% increase every 15 seconds
+            const speedMultiplier = 1 + Math.floor(timeElapsed / 15) * 0.05;
+            let currentGlobalSpeed = globalSpeed * speedMultiplier;
+
+            // Handle Skill 3 (Time Slow active)
+            if (SKILL_COOLDOWNS[3].active) {
+                currentGlobalSpeed *= 0.35; // Slow down time to 35%
+            }
+
+            // Screen shake dampening
+            if (screenShake > 0) screenShake -= 0.6;
+
+            // Cooldown computations
+            for (let key in SKILL_COOLDOWNS) {
+                const sc = SKILL_COOLDOWNS[key];
+                if (sc.currentCD > 0) {
+                    sc.currentCD -= dt;
+                    if (sc.currentCD < 0) sc.currentCD = 0;
+                }
+                if (sc.active) {
+                    sc.duration -= dt;
+                    if (sc.duration <= 0) {
+                        sc.active = false;
+                        // Reset active durations for next triggers
+                        sc.duration = key == 1 ? 4.0 : (key == 2 ? 0.35 : 4.0);
+                    }
+                }
+                
+                // Update visual cooldown overlay
+                const ring = document.getElementById(`skill-${key}-cooldown-ring`);
+                if (ring) {
+                    const pct = sc.currentCD > 0 ? (sc.currentCD / sc.maxCD) * 100 : 0;
+                    ring.style.height = `${pct}%`;
+                    ring.innerText = sc.currentCD > 0 ? Math.ceil(sc.currentCD) : '';
+                }
+            }
+
+            // Invincibility management
+            if (isInvincible) {
+                invincibilityTimer -= dt;
+                if (invincibilityTimer <= 0) {
+                    isInvincible = false;
+                }
+            }
+
+            // Streak combo decay
+            if (streak > 0) {
+                streakDecayTimer -= dt;
+                if (streakDecayTimer <= 0) {
+                    streak = 0;
+                    sound.playStreakBreak();
+                    updateHud();
+                }
+            }
+
+            // Smooth linear needle interpolation (Move action)
+            let snapSpeed = SKILL_COOLDOWNS[2].active ? 0.35 : 0.15; // Dashing snaps fast
+            // Support keyboard keys
+            if (keys['ArrowLeft'] || keys['KeyA']) {
+                targetX -= 12;
+            }
+            if (keys['ArrowRight'] || keys['KeyD']) {
+                targetX += 12;
+            }
+            targetX = Math.max(15, Math.min(canvas.width - 15, targetX));
+            needleX += (targetX - needleX) * snapSpeed;
+
+            // Update background seam scroll offset
+            backgroundScrollOffset += currentGlobalSpeed * dt;
+            if (backgroundScrollOffset >= 40) backgroundScrollOffset = 0;
+
+            // VERLET THREAD PHYSICS UPDATE
+            // Anchor head to needle base eye
+            threadSegments[0].x = needleX;
+            threadSegments[0].y = needleY + 16;
+
+            for (let i = 0; i < threadSegments.length; i++) {
+                let seg = threadSegments[i];
+                if (hasBrokenThread && i >= brokenIndex) {
+                    // Severed yarn segment behaves freely falling with heavier gravity
+                    seg.vy += 0.45;
+                    seg.vx *= 0.96;
+                    seg.vy *= 0.96;
+                    seg.x += seg.vx;
+                    seg.y += seg.vy;
+                    continue;
+                }
+
+                if (i > 0) {
+                    // Simple Verlet physics equations
+                    let tempX = seg.x;
+                    let tempY = seg.y;
+                    
+                    // Friction drag pull
+                    let vx = (seg.x - seg.px) * 0.88;
+                    let vy = (seg.y - seg.py) * 0.88;
+
+                    // Gravity pull
+                    vy += 0.15;
+
+                    // Backwards movement force pulls string back organically
+                    vy += (currentGlobalSpeed * 0.03);
+
+                    seg.x += vx;
+                    seg.y += vy;
+                    seg.px = tempX;
+                    seg.py = tempY;
+                }
+            }
+
+            // Constraints resolution pass
+            for (let loop = 0; loop < 3; loop++) {
+                for (let i = 1; i < threadSegments.length; i++) {
+                    if (hasBrokenThread && i >= brokenIndex) continue;
+
+                    let seg = threadSegments[i];
+                    let prev = threadSegments[i-1];
+
+                    let dx = seg.x - prev.x;
+                    let dy = seg.y - prev.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    let target = SEGMENT_DIST;
+
+                    if (dist > 1.0) {
+                        let diff = (target - dist) / dist;
+                        let offsetx = dx * diff * 0.55;
+                        let offsety = dy * diff * 0.55;
+
+                        seg.x += offsetx;
+                        seg.y += offsety;
+                        if (i > 1) { // Leave anchor 0 untouched
+                            prev.x -= offsetx;
+                            prev.y -= offsety;
+                        }
+                    }
+                }
+            }
+
+            // DUST / PUFF SPARKLE UPDATES
+            particles.update();
+
+            // SCISSORS EVENT SPAWN TIMERS
+            scissorSpawnTimer -= dt;
+            if (scissorSpawnTimer <= 0 && !scissorWarningActive) {
+                sound.playNewMechanicIntro();
+                scissorWarningActive = true;
+                scissorWarningSide = Math.random() > 0.5 ? 'left' : 'right';
+                // Targets the area slightly above current needle height
+                scissorWarningY = needleY - 80 - Math.random() * 100;
+                scissorSpawnTimer = 1.6; // Time to warning alarm snap!
+            } else if (scissorWarningActive && scissorSpawnTimer <= 0) {
+                // Execute Scissor Cut Snap!
+                executeScissorCut();
+                scissorWarningActive = false;
+                // Setup next scissor spawn alert
+                scissorSpawnTimer = 14 + Math.random() * 10;
+            }
+
+            // MAGNET ACTIVE MECHANICS: pulls gold buttons to needle tip
+            const isMagnetActive = SKILL_COOLDOWNS[1].active;
+
+            // UPDATE SCROLLING OBSTACLES
+            nextSpawnTimer -= dt;
+            if (nextSpawnTimer <= 0) {
+                spawnObstacle();
+                nextSpawnTimer = 1.0 + Math.random() * 1.5;
+            }
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                obs.y += currentGlobalSpeed * dt;
+
+                // Handle active magnet pull
+                if (isMagnetActive && (obs.type === 'button' || obs.type === 'buttonhole')) {
+                    const dx = needleX - obs.x;
+                    const dy = needleY - obs.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 280) {
+                        // Slowly magnetic pull horizontally
+                        obs.x += (needleX - obs.x) * 0.08;
+                    }
+                }
+
+                // COLLISION MECHANIC
+                // We check boundaries near needle tip (actual collider tip: radius 6px)
+                const needleRadius = 6;
+                const tipY = needleY; // Topmost point of metal tip
+
+                // Detect proximity for "Near Miss" system (Satisfies dimension 2)
+                if (obs.type === 'pin' && !obs.passed && state === 'PLAYING') {
+                    // Check if passed needle vertically
+                    if (Math.abs(obs.y - tipY) < 15) {
+                        const dist = Math.abs(obs.x - needleX);
+                        if (dist > 15 && dist < 35) { // Passes extremely close but safe
+                            triggerNearMiss(obs);
+                        }
+                    }
+                }
+
+                if (!obs.passed && obs.y >= (tipY - 12) && obs.y <= (tipY + 18)) {
+                    // Horizontal overlaps
+                    if (obs.type === 'buttonhole') {
+                        // Slot horizontal margins
+                        const inSlot = Math.abs(needleX - obs.x) < 14;
+                        if (inSlot) {
+                            // Perfect Threaded pass!
+                            obs.passed = true;
+                            triggerScore(obs);
+                        } else {
+                            // Collided with hard buttonhole outer frame!
+                            if (!isInvincible && !SKILL_COOLDOWNS[2].active) {
+                                triggerDamage();
+                                obs.passed = true; // Avoid double hitting
+                            }
+                        }
+                    } else if (obs.type === 'button') {
+                        // Button plate outer bounds
+                        const dist = Math.sqrt((needleX - obs.x)**2 + (tipY - obs.y)**2);
+                        if (dist < 25) {
+                            // Success button threaded stitch!
+                            obs.passed = true;
+                            triggerScore(obs);
+                        }
+                    } else if (obs.type === 'pin') {
+                        // Silver Needle Pin Head (Extremely dangerous sphere)
+                        const dist = Math.sqrt((needleX - obs.x)**2 + (tipY - obs.y)**2);
+                        if (dist < 18) {
+                            obs.passed = true;
+                            if (SKILL_COOLDOWNS[2].active) {
+                                // Dash destroys pins!
+                                particles.spawn(obs.x, obs.y, '#F59E0B', 'star', 12);
+                                sound.playScore(5);
+                                awardXp(40);
+                                score += 300;
+                                spawnFloatingText(obs.x, obs.y, "CRASHED! +300", '#10B981');
+                            } else if (!isInvincible) {
+                                triggerDamage();
+                            }
+                        }
+                    }
+                }
+
+                // Cull off-screen items
+                if (obs.y > canvas.height + 100) {
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // FLOATING STAT TEXTS
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y += ft.vy;
+                ft.opacity -= 0.025;
+                if (ft.opacity <= 0) {
+                    floatingTexts.splice(i, 1);
+                }
+            }
+        }
+
+        // TRIGGER NEAR MISS REWARDS
+        function triggerNearMiss(obs) {
+            obs.passed = true;
+            sound.playNearMiss();
+            screenShake = 6;
+            score += 150;
+            awardXp(15);
+            spawnFloatingText(needleX, needleY - 20, "NEAR MISS! +150", '#D97706');
+            
+            // Show HUD flash toast
+            const toast = document.getElementById('toast-banner');
+            toast.innerText = "NEAR MISS! +150";
+            toast.classList.remove('scale-0', 'opacity-0');
+            toast.classList.add('scale-100', 'opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('scale-100', 'opacity-100');
+                toast.classList.add('scale-0', 'opacity-0');
+            }, 800);
+        }
+
+        // SCISSORS SNAP EVENT
+        function executeScissorCut() {
+            // Animates a full scissor line intersect across the entire canvas width
+            const lineY = scissorWarningY;
+            particles.spawn(canvas.width / 2, lineY, '#94A3B8', 'puff', 15);
+            sound.playStreakBreak();
+
+            // Check if scissors intersect the needle itself
+            if (Math.abs(needleY - lineY) < 15) {
+                if (!isInvincible) {
+                    triggerDamage();
+                }
+                return;
+            }
+
+            // Check if scissors cross any dangling physical thread points
+            for (let i = 1; i < threadSegments.length; i++) {
+                if (hasBrokenThread && i >= brokenIndex) continue;
+                
+                const seg1 = threadSegments[i-1];
+                const seg2 = threadSegments[i];
+
+                // Simple check if line segment crosses vertical scissor plane
+                if ((seg1.y >= lineY && seg2.y <= lineY) || (seg2.y >= lineY && seg1.y <= lineY)) {
+                    // Caught thread snapped!
+                    hasBrokenThread = true;
+                    brokenIndex = i;
+                    streak = 0; // Combo breaks!
+                    updateHud();
+
+                    // Explode sparks at the snapped node
+                    particles.spawn((seg1.x + seg2.x)/2, lineY, '#F43F5E', 'spark', 15);
+                    spawnFloatingText((seg1.x + seg2.x)/2, lineY - 20, "THREAD CUT! COMBO BREAK", '#EF4444');
+                    break;
+                }
+            }
+        }
+
+        // SCORE ACHIEVED ENGINE
+        function triggerScore(obs) {
+            sound.playAction();
+            stitches++;
+            streak++;
+            streakDecayTimer = 3.5; // Seconds to secure next stitch
+            
+            if (streak > peakStreak) peakStreak = streak;
+
+            let pts = obs.type === 'button' ? 200 : 100;
+            const streakBonus = Math.floor(pts * (streak * 0.1));
+            const total = pts + streakBonus;
+
+            score += total;
+            awardXp(obs.type === 'button' ? 25 : 15);
+
+            // Audio pitch grows taller with combo
+            sound.playScore(streak);
+
+            // Pop sparkly visual particles
+            const col = obs.type === 'button' ? '#F59E0B' : '#10B981';
+            particles.spawn(obs.x, obs.y, col, 'star', 10);
+            spawnFloatingText(obs.x, obs.y - 15, `+${total} ${streak > 1 ? '('+streak+'x)' : ''}`, col);
+
+            // Extra juicy combo burst
+            if (streak > 0 && streak % 5 === 0) {
+                sound.playCombo();
+                particles.spawn(needleX, needleY, '#C084FC', 'puff', 20); // Unique purple combo sparkler
+            }
+
+            // Slowly stitch regrows if it was previously cut by scissors
+            if (hasBrokenThread) {
+                brokenIndex++;
+                if (brokenIndex >= THREAD_LENGTH) {
+                    hasBrokenThread = false;
+                    brokenIndex = -1;
+                }
+            }
+
+            updateHud();
+        }
+
+        // FAULT DAMAGE RESOLUTION
+        function triggerDamage() {
+            if (isInvincible) return;
+
+            lives--;
+            sound.playDeath();
+            screenShake = 12;
+
+            // Visual flashing impact
+            isInvincible = true;
+            invincibilityTimer = 1.5; // 1.5 seconds recovery invulnerability
+
+            particles.spawn(needleX, needleY, '#EF4444', 'spark', 18);
+            spawnFloatingText(needleX, needleY - 25, "SNAP! -1 THREAD", '#EF4444');
+
+            updateHud();
+
+            if (lives <= 0) {
+                triggerGameOver();
+            }
+        }
+
+        // CANVAS DRAW ENGINE
+        function render() {
+            ctx.save();
+            
+            // Screen Shake action
+            if (screenShake > 0) {
+                const dx = (Math.random() - 0.5) * screenShake;
+                const dy = (Math.random() - 0.5) * screenShake;
+                ctx.translate(dx, dy);
+            }
+
+            // Draw Warm Linen fabric texture
+            ctx.fillStyle = PALETTE.bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw stitched dashed seams (Cozy scroll texture grid)
+            ctx.strokeStyle = PALETTE.grid;
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([8, 12]);
+            
+            const cols = 5;
+            const spacing = canvas.width / cols;
+            for (let i = 1; i < cols; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * spacing, -40 + backgroundScrollOffset);
+                ctx.lineTo(i * spacing, canvas.height + 40);
+                ctx.stroke();
+            }
+
+            // Draw Scissors Alarm horizontal warning plane
+            if (scissorWarningActive) {
+                ctx.save();
+                ctx.strokeStyle = `rgba(239, 68, 68, ${0.4 + Math.sin(Date.now() * 0.015) * 0.3})`;
+                ctx.lineWidth = 4;
+                ctx.setLineDash([6, 6]);
+                ctx.beginPath();
+                ctx.moveTo(0, scissorWarningY);
+                ctx.lineTo(canvas.width, scissorWarningY);
+                ctx.stroke();
+
+                // Alarm indicator text box
+                ctx.fillStyle = '#EF4444';
+                ctx.font = 'bold 9px Fredoka';
+                ctx.fillText("⚠️ SCISSORS SNAP DANGER!", 15, scissorWarningY - 8);
+                ctx.restore();
+            }
+
+            // DRAW SCROLLING OBSTACLES
+            for (let i = 0; i < obstacles.length; i++) {
+                const obs = obstacles[i];
+                ctx.save();
+
+                // Drop shadows
+                ctx.shadowColor = 'rgba(40, 30, 10, 0.15)';
+                ctx.shadowBlur = 6;
+                ctx.shadowOffsetY = 4;
+
+                if (obs.type === 'buttonhole') {
+                    // Round outer slot boundary panel
+                    ctx.fillStyle = '#E2E8F0';
+                    ctx.strokeStyle = '#94A3B8';
+                    ctx.lineWidth = 3;
+                    
+                    // Rounded capsule drawing
+                    ctx.beginPath();
+                    ctx.roundRect(obs.x - obs.width/2, obs.y - obs.height/2, obs.width, obs.height, 8);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Dark slit of the eyelet
+                    ctx.fillStyle = '#1E293B';
+                    ctx.beginPath();
+                    ctx.roundRect(obs.x - obs.width/4, obs.y - 2, obs.width/2, 4, 2);
+                    ctx.fill();
+
+                } else if (obs.type === 'button') {
+                    // Circle classic outer button rim
+                    ctx.fillStyle = obs.buttonType === 'fancy' ? '#3B82F6' : PALETTE.buttonInside;
+                    ctx.strokeStyle = obs.buttonType === 'fancy' ? '#1D4ED8' : PALETTE.buttonGold;
+                    ctx.lineWidth = 4;
+
+                    ctx.beginPath();
+                    ctx.arc(obs.x, obs.y, 20, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Inner stitch ring
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath();
+                    ctx.arc(obs.x, obs.y, 14, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // 4 Button Thread Holes
+                    ctx.fillStyle = '#1E293B';
+                    ctx.setLineDash([]); // clear
+                    const holes = [
+                        {x: -6, y: -6}, {x: 6, y: -6},
+                        {x: -6, y: 6}, {x: 6, y: 6}
+                    ];
+                    holes.forEach(h => {
+                        ctx.beginPath();
+                        ctx.arc(obs.x + h.x, obs.y + h.y, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+
+                } else if (obs.type === 'pin') {
+                    // Draw Sewing Pin
+                    // Long metal shaft pointing downward
+                    ctx.strokeStyle = PALETTE.pinShaft;
+                    ctx.lineWidth = 3.5;
+                    ctx.beginPath();
+                    ctx.moveTo(obs.x, obs.y);
+                    ctx.lineTo(obs.x, obs.y + obs.height);
+                    ctx.stroke();
+
+                    // Bright sharp scarlet spherical glass head
+                    ctx.fillStyle = PALETTE.pinHead;
+                    ctx.beginPath();
+                    ctx.arc(obs.x, obs.y, 11, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Gradient glint on glass ball head
+                    const grad = ctx.createRadialGradient(obs.x - 4, obs.y - 4, 1, obs.x, obs.y, 11);
+                    grad.addColorStop(0, '#FFAAAA');
+                    grad.addColorStop(1, 'transparent');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(obs.x, obs.y, 11, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+
+            // DRAW PHYSICALLY TRAILING THREAD YARN (Organic Verlet spline curve)
+            if (threadSegments.length > 1) {
+                ctx.save();
+                
+                // Segment thickness gets finer towards end tail
+                for (let i = 1; i < threadSegments.length; i++) {
+                    if (hasBrokenThread && i >= brokenIndex) continue;
+
+                    const prev = threadSegments[i-1];
+                    const curr = threadSegments[i];
+                    
+                    ctx.strokeStyle = getThreadColor(i / threadSegments.length);
+                    // Beautiful tapered thickness line
+                    ctx.lineWidth = Math.max(1.5, 4.5 * (1 - (i / threadSegments.length)));
+                    ctx.lineCap = 'round';
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(prev.x, prev.y);
+                    ctx.lineTo(curr.x, curr.y);
+                    ctx.stroke();
+                }
+
+                // If thread has been cut, draw severed segments falling down offscreen
+                if (hasBrokenThread) {
+                    for (let i = brokenIndex; i < threadSegments.length; i++) {
+                        const prev = threadSegments[i-1] || threadSegments[brokenIndex];
+                        const curr = threadSegments[i];
+                        ctx.strokeStyle = 'rgba(200, 200, 200, 0.4)'; // Fades out
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(prev.x, prev.y);
+                        ctx.lineTo(curr.x, curr.y);
+                        ctx.stroke();
+                    }
+                }
+                ctx.restore();
+            }
+
+            // DRAW STEEL SEWING NEEDLE (Always rendered in center vertical plane)
+            ctx.save();
+            ctx.translate(needleX, needleY);
+
+            // Shimmer flashing if recovering invincible
+            if (isInvincible && Math.floor(Date.now() / 60) % 2 === 0) {
+                ctx.globalAlpha = 0.35;
+            }
+
+            // Drop needle shadow
+            ctx.shadowColor = 'rgba(30, 25, 20, 0.18)';
+            ctx.shadowBlur = 5;
+            ctx.shadowOffsetY = 10;
+
+            // Needle Main Silver Body Pointing upwards
+            // Draws beautiful steel needle tapering from base (Y=24) to precise tip (Y=0)
+            ctx.fillStyle = PALETTE.needleSteel;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);       // The sharp tip point
+            ctx.lineTo(4, 8);
+            ctx.lineTo(3.5, 24);    // Needle base width
+            ctx.lineTo(-3.5, 24);
+            ctx.lineTo(-4, 8);
+            ctx.closePath();
+            ctx.fill();
+
+            // Eye of the needle hole
+            ctx.fillStyle = '#334155';
+            ctx.beginPath();
+            ctx.ellipse(0, 16, 1.8, 4.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Metallic glint highlighting
+            ctx.fillStyle = '#FFFFFF';
+            ctx.globalAlpha = 0.4;
+            ctx.beginPath();
+            ctx.moveTo(-1, 2);
+            ctx.lineTo(0.5, 2);
+            ctx.lineTo(1, 22);
+            ctx.lineTo(-0.5, 22);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+
+            // DRAW COLLIDING CONFETTI / RUMBLE SPARKS
+            particles.draw(ctx);
+
+            // DRAW POPPING SCORE TEXTS
+            for (let i = 0; i < floatingTexts.length; i++) {
+                const ft = floatingTexts[i];
+                ctx.save();
+                ctx.globalAlpha = ft.opacity;
+                ctx.fillStyle = ft.color;
+                ctx.font = 'bold 11px Fredoka';
+                ctx.textAlign = 'center';
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+                ctx.shadowBlur = 4;
+                ctx.fillText(ft.txt, ft.x, ft.y);
+                ctx.restore();
+            }
+
+            ctx.restore();
+        }
+
+        // TRIGGER ON WINDOW LOAD
+        window.addEventListener('load', () => {
+            lastTs = performance.now();
+            requestAnimationFrame(loop);
+        });
+
+    </script>
+</body>
+</html>
